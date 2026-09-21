@@ -1,106 +1,74 @@
-# Micrograd From Scratch
+# Neural Networks: Zero to Hero
 
-I am learning neural networks by building a tiny automatic differentiation engine from scratch in Python.
+This repository is my learning journal while working through Andrej Karpathy's **Neural Networks: Zero to Hero** playlist.
 
-The main project is [`micrograd.ipynb`](micrograd.ipynb). It is an educational notebook, not a production deep learning library. The goal is to understand what happens during a forward pass, backpropagation, and gradient descent.
+I am implementing the ideas myself, writing notes, and experimenting with the code. The projects are educational exercises, not official implementations of Karpathy's work.
 
-## What is included?
+## Projects
 
-The notebook currently covers:
+| Project                 | Status      | What I am learning                                                  |
+| ----------------------- | ----------- | ------------------------------------------------------------------- |
+| [micrograd](micrograd/) | In progress | Derivatives, computation graphs, backpropagation, neurons, and MLPs |
+| [makemore](makemore/)   | Planned     | Character-level language models and text generation                 |
 
-- Numerical differentiation and computation graphs.
-- A scalar `Value` class with `data` and `grad`.
-- Addition, multiplication, and `tanh` operations.
-- Reverse-mode automatic differentiation with `backward()`.
-- Computation graph visualization with Graphviz.
-- `Neuron`, `Layer`, and `MLP` classes.
-- A small dataset, mean-squared-error-style loss, and gradient-descent training.
-- A comparison with PyTorch tensors and gradients.
+Each project has its own README with its purpose, setup instructions, progress, and notes.
 
-The core idea is simple:
+## Recommended structure
 
-1. Build values through mathematical operations.
-2. Store the computation graph.
-3. Propagate gradients backward using the chain rule.
-4. Update parameters to reduce the loss.
+This is one repository with one folder per project:
 
-## Quick start
+```text
+Neural Network Zero to Hero/
+|-- README.md              # Playlist roadmap and repository overview
+|-- micrograd/
+|   |-- README.md          # Project-specific notes and setup
+|   `-- micrograd.ipynb
+`-- makemore/
+    `-- README.md          # Added as the project develops
+```
 
-Install the Python dependencies:
+Keeping everything together makes the learning journey easy to follow, while separate folders keep each project focused. A separate repository would only be useful if a project later becomes an independent, reusable library.
+
+## Setup
+
+Create and activate the virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Install packages as each project needs them. For the current micrograd notebook:
 
 ```bash
 pip install numpy matplotlib graphviz jupyter torch
 ```
 
-Graphviz also needs to be installed on your system. On Ubuntu or Debian:
+Graphviz also needs to be installed on the system. On Ubuntu or Debian:
 
 ```bash
 sudo apt install graphviz
 ```
 
-Open the notebook with Jupyter:
+Open notebooks with VS Code or run:
 
 ```bash
 jupyter notebook
 ```
 
-Then open `micrograd.ipynb`. It also works in VS Code with the Python and Jupyter extensions.
+## Learning roadmap
 
-## Example
+- [x] Build scalar automatic differentiation with micrograd.
+- [x] Build neurons, layers, and a small MLP.
+- [ ] Complete the micrograd experiments and add gradient tests.
+- [ ] Build makemore with character-level language models.
+- [ ] Study batching, normalization, and training improvements.
+- [ ] Implement a small language model and GPT-style components.
 
-The notebook builds a multilayer perceptron like this:
+The checklist will change as I work through the playlist.
 
-```python
-n = MLP(3, [4, 4, 1])
-```
+## Attribution
 
-Then it trains the model by repeatedly:
+This repository follows the ideas and lessons from Andrej Karpathy's [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) course and [micrograd](https://github.com/karpathy/micrograd) project.
 
-```python
-ypred = [n(x) for x in xs]
-loss = sum((yout - ygt) ** 2 for ygt, yout in zip(ys, ypred))
-
-for p in n.parameters():
-    p.grad = 0.0
-
-loss.backward()
-
-for p in n.parameters():
-    p.data += -0.01 * p.grad
-```
-
-This makes the relationship between neural networks, gradients, and parameter updates easier to see.
-
-## Project structure
-
-```text
-Neural Network Zero to Hero/
-|-- README.md
-`-- micrograd/
-    `-- micrograd.ipynb
-```
-
-## Learning goals
-
-I am using this project to understand:
-
-- Derivatives and the chain rule.
-- Backpropagation and automatic differentiation.
-- Activation functions and loss functions.
-- Neurons, layers, and multilayer perceptrons.
-- Gradient descent and model training.
-
-## Acknowledgement
-
-This is an independent learning exercise based on Andrej Karpathy's educational walkthrough, [The spelled-out intro to neural networks and backpropagation: building micrograd](https://youtu.be/VMj-3S1tku0).
-
-The ideas and learning material come from Karpathy's work. This notebook is my own practice implementation and notes while following along. It is not the original micrograd project, an official implementation, or an attempt to claim ownership of Karpathy's work. Please see the original tutorial and [micrograd repository](https://github.com/karpathy/micrograd) for the source material.
-
-## Next steps
-
-- Move the implementation from the notebook into Python modules.
-- Add more operations and activation functions.
-- Add tests for the gradients.
-- Improve the training examples and experiment with different network sizes.
-
-This project is still in progress as I learn.
+The code, notes, and experiments here are my own learning work. They are not official Karpathy projects and do not claim ownership of the original material.
