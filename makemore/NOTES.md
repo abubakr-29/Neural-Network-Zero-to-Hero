@@ -1,7 +1,8 @@
 # Makemore Study Notes
 
 These notes explain what is happening in
-[`makemore.ipynb`](makemore.ipynb). They are written as a reminder for my
+[`makemore_1.ipynb`](makemore_1.ipynb) and
+[`makemore_2.ipynb`](makemore_2.ipynb). They are written as a reminder for my
 future self, so the explanations focus on the ideas behind the code rather
 than only describing what each line does.
 
@@ -297,7 +298,69 @@ This makes the bigram model a useful first neural-network example. It is small
 enough to inspect while still demonstrating datasets, logits, probabilities,
 losses, gradients, and parameter updates.
 
-## 12. How to run the notebook
+## 12. The two notebooks
+
+The project is split into two notebooks so the ideas can be learned in a
+reasonable order.
+
+### `makemore_1.ipynb`: the bigram model
+
+The first notebook starts with the simplest useful version of makemore. It:
+
+- Counts how often one character follows another.
+- Stores those counts in a `27 x 27` table.
+- Normalizes the rows into probabilities.
+- Generates names from those probabilities.
+- Measures the model with negative log-likelihood.
+- Rebuilds the same idea as a small neural network with a `27 x 27` weight
+  matrix.
+
+This notebook is mainly about understanding character transitions,
+probabilities, loss, gradients, and the connection between counts and neural
+network weights.
+
+### `makemore_2.ipynb`: the MLP language model
+
+The second notebook moves beyond bigrams. Instead of looking at only the
+current character, it uses the previous **three characters** as context.
+
+For example, the model can use:
+
+```text
+context: . . e  ->  next character: m
+```
+
+The notebook:
+
+- Builds `(context, target)` examples with a `block_size` of `3`.
+- Uses `build_dataset(words)` to prepare data consistently.
+- Shuffles the names with a fixed seed.
+- Splits the data into 80% training, 10% development, and 10% test sets.
+- Learns a 10-dimensional embedding for each of the 27 characters.
+- Flattens the three embeddings into 30 inputs.
+- Passes those inputs through a hidden layer of 200 neurons.
+- Produces 27 output logits, one for each possible next character.
+- Uses minibatches of 32 examples during training.
+- Uses `F.cross_entropy` as a numerically stable loss function.
+- Trains for 200,000 steps and lowers the learning rate halfway through.
+- Compares training and development loss.
+- Plots the learned character embeddings and samples new names.
+
+The main model parameters are:
+
+```text
+C: 27 x 10 character embedding table
+W1: 30 x 200 first-layer weights
+b1: 200 first-layer biases
+W2: 200 x 27 output-layer weights
+b2: 27 output-layer biases
+```
+
+This is a real progression from the first notebook. The model now learns a
+useful representation for each character instead of using only one-hot input
+vectors.
+
+## 13. How to run the notebooks
 
 From the repository root:
 
@@ -305,14 +368,14 @@ From the repository root:
 source .venv/bin/activate
 pip install jupyter torch matplotlib
 cd makemore
-jupyter notebook makemore.ipynb
+jupyter notebook
 ```
 
 Alternatively, open the notebook in VS Code with the Jupyter extension.
 
 For a clean run:
 
-1. Open `makemore.ipynb`.
+1. Open `makemore_1.ipynb` or `makemore_2.ipynb`.
 2. Select the Python environment containing PyTorch.
 3. Restart the kernel.
 4. Run all cells from the beginning.
@@ -321,7 +384,7 @@ The notebook is an interactive learning document. It includes intermediate
 outputs and experiments, so it is normal for it to contain more steps than a
 small production script.
 
-## 13. Current progress and next steps
+## 14. Current progress and next steps
 
 - [x] Load and inspect the names dataset.
 - [x] Add start and end tokens.
@@ -330,16 +393,19 @@ small production script.
 - [x] Generate names from the count-based model.
 - [x] Calculate negative log-likelihood.
 - [x] Train the bigram model with a small neural network.
-- [ ] Split the data into training, validation, and test sets.
-- [ ] Build a multilayer perceptron language model.
-- [ ] Learn embeddings and use a larger context.
-- [ ] Add batching and improve the optimization process.
+- [x] Split the data into training, development, and test sets.
+- [x] Build a multilayer perceptron language model.
+- [x] Learn character embeddings and use a larger context.
+- [x] Add minibatch training and learning-rate decay.
 - [ ] Explore deeper models and batch normalization.
+- [ ] Improve initialization and evaluate the test split consistently.
 
-## 14. Quick reminders
+## 15. Quick reminders
 
-- Run the notebook from the `makemore` directory so `names.txt` is found.
-- Run cells from top to bottom because later cells use earlier variables.
+- Run the notebooks from the `makemore` directory so `names.txt` is found.
+- Run each notebook's cells from top to bottom because later cells use earlier
+  variables.
+- Start with `makemore_1.ipynb` before moving to `makemore_2.ipynb`.
 - Generated names are random samples, not guaranteed to be real names.
 - A fixed random seed makes an experiment repeatable.
 - The model predicts characters, not words or meanings.

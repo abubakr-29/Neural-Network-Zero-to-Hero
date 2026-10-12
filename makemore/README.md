@@ -7,27 +7,34 @@ The goal is to understand how a model can learn patterns from names and
 generate new names one character at a time. This is an educational exercise,
 not the official makemore project.
 
-For simple, detailed explanations of the notebook, see the
+For simple, detailed explanations of both notebooks, see the
 [makemore study notes](NOTES.md).
 
 ## What is included?
 
-The notebook currently covers:
+The project currently has two notebooks that show the model growing in stages:
+
+- [`makemore_1.ipynb`](makemore_1.ipynb): a character bigram model.
+- [`makemore_2.ipynb`](makemore_2.ipynb): a small multilayer perceptron
+  language model with embeddings and a 3-character context.
+
+Together, the notebooks cover:
 
 - Loading and inspecting a dataset of 32,033 names.
 - Adding a special start/end token to each name.
 - Counting character pairs, also called bigrams.
 - Building a `27 x 27` character transition table.
 - Converting counts into probabilities.
-- Sampling new names from the probability table.
-- Measuring the model with negative log-likelihood.
-- Rebuilding the bigram model as a small neural network.
-- Training the model with backpropagation and gradient descent.
-- Sampling new names from the trained neural network.
+- Sampling new names from a probability table.
+- Measuring a model with negative log-likelihood.
+- Splitting data into training, development, and test sets.
+- Representing characters with learned embeddings.
+- Predicting the next character from a context of three characters.
+- Training an MLP with minibatches, backpropagation, and gradient descent.
+- Evaluating training and development losses.
 
-The main files are:
+The other important files are:
 
-- [`makemore.ipynb`](makemore.ipynb): the experiments and code.
 - [`names.txt`](names.txt): one training name per line.
 - [`NOTES.md`](NOTES.md): detailed explanations and learning notes.
 
@@ -41,38 +48,51 @@ source .venv/bin/activate
 pip install jupyter torch matplotlib
 ```
 
-Open [`makemore.ipynb`](makemore.ipynb) in VS Code, or run the following from
-this folder:
+Open either notebook in VS Code, or run the following from this folder:
 
 ```bash
 cd makemore
-jupyter notebook makemore.ipynb
+jupyter notebook
 ```
 
-Run the notebook cells from top to bottom. The cells depend on variables
-created earlier, so **Restart Kernel and Run All** is the easiest way to start
-fresh.
+Run each notebook from top to bottom. The cells depend on variables created
+earlier, so **Restart Kernel and Run All** is the easiest way to start fresh.
+
+## Recommended order
+
+Start with [`makemore_1.ipynb`](makemore_1.ipynb). It introduces the basic
+ideas using character counts and a simple bigram neural network.
+
+Then continue with [`makemore_2.ipynb`](makemore_2.ipynb). It rewrites the
+dataset preparation more clearly and builds a neural network that uses the
+previous three characters to predict the next one.
 
 ## Main idea
 
 The project follows this learning cycle:
 
 1. Add a start/end marker to each name.
-2. Count which characters commonly follow other characters.
-3. Turn the counts into probabilities.
-4. Generate a name by sampling one character at a time.
-5. Measure the model with negative log-likelihood.
-6. Learn the same probabilities using a neural network and gradient descent.
+2. Prepare examples of context characters and next-character targets.
+3. Convert characters into integer indexes and learned embeddings.
+4. Use a neural network to produce logits for the next character.
+5. Calculate cross-entropy loss.
+6. Update the parameters with backpropagation and gradient descent.
+7. Generate names by repeatedly sampling the next character.
 
-The first model is a bigram model, so it only looks at the current character
-when predicting the next one. For example, after seeing `e`, it learns how
-likely the next character is to be `m`, `l`, `r`, or another character.
+The first notebook looks only at the current character. The second notebook
+uses a context of three characters, which gives the model more information
+when making a prediction.
 
 ## Current status
 
-The count-based bigram model and its neural-network version are implemented.
-The next steps are to add train/validation/test splits, build a multilayer
-perceptron language model, and explore batching and improved optimization.
+The bigram model and the first MLP language model are implemented. The second
+notebook now includes an 80% training split, a 10% development split, and a
+10% test split, along with learned character embeddings and minibatch
+training.
+
+The next steps are to improve the model and continue through the later
+makemore lessons, including better initialization, normalization, deeper
+networks, and more systematic evaluation.
 
 ## Attribution
 
@@ -80,5 +100,5 @@ This project is based on what I am learning from Andrej Karpathy's
 [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) course
 and [makemore](https://github.com/karpathy/makemore).
 
-The notebook contains my own practice code and notes. It is not an official
+The notebooks contain my own practice code and notes. They are not an official
 implementation or a replacement for the original project.
