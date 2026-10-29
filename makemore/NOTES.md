@@ -1,63 +1,52 @@
 # Makemore Study Notes
 
-These notes explain what is happening in
-[`makemore_1.ipynb`](makemore_1.ipynb) and
-[`makemore_2.ipynb`](makemore_2.ipynb). They are written as a reminder for my
-future self, so the explanations focus on the ideas behind the code rather
-than only describing what each line does.
+These notes explain the five main makemore notebooks:
+
+1. [`makemore_1.ipynb`](makemore_1.ipynb)
+2. [`makemore_2.ipynb`](makemore_2.ipynb)
+3. [`makemore_3.ipynb`](makemore_3.ipynb)
+4. [`makemore_4.ipynb`](makemore_4.ipynb)
+5. [`makemore_5.ipynb`](makemore_5.ipynb)
+
+They are written as reminders for my future self. The important thing is not
+only what the code does, but why each change makes the model more useful.
 
 ## 1. What is makemore?
 
-Makemore is a small character-level language-modeling project. We give the
-model a list of names and ask it to learn the patterns in those names. After
-training, it can generate new names by predicting one character at a time.
+Makemore is a character-level language-modeling project. We give the model a
+list of names and ask it to learn the patterns in those names. After training,
+it generates new names by predicting one character at a time.
 
-The model does not understand what a name means. It only learns which
-characters tend to appear together and in which order.
+The model does not understand the meaning of a name. It learns statistical
+patterns such as:
 
-For example, after seeing many names, the model may learn that:
+- which letters often begin a name,
+- which characters commonly follow one another,
+- which sequences tend to appear near the end, and
+- how a longer context can help predict the next character.
 
-- `q` is often followed by `u`.
-- `m` can be followed by `a`, `e`, or another `m`.
-- A name often begins with a few common letters.
-- Some letters are more likely to appear near the end of a name.
+The generated names are samples from those learned patterns. They can look
+name-like without being real names from the dataset.
 
-The generated names are samples from these learned patterns. They may look
-name-like, but they do not need to be real names.
+## 2. Shared dataset and vocabulary
 
-## 2. Loading the dataset
-
-The notebook reads the names with:
+All five parts use `names.txt`, which contains one name per line. The notebook
+loads it with:
 
 ```python
 words = open("names.txt", "r").read().splitlines()
 ```
 
-`splitlines()` turns the file into a Python list where each item is one name.
-The current dataset contains 32,033 names.
+The dataset contains 32,033 names.
 
-The notebook also checks the shortest and longest names. These quick checks
-help us understand the data before building the model.
-
-The file is loaded with a relative path, so the notebook expects the current
-working directory to be the `makemore` folder. If it cannot find
-`names.txt`, check the notebook's working directory first.
-
-## 3. Start and end tokens
-
-The model needs to know where a name starts and where it ends. The notebook
-uses `.` as a special token:
+The model uses lowercase letters plus `.` as a special token. The dot marks
+both the beginning and the end of a name:
 
 ```text
 . emma .
 ```
 
-The dot is not a letter in the dataset. It means:
-
-- The first `.` marks the beginning of a name.
-- The final `.` marks the end of a name.
-
-For `emma`, the character transitions are:
+For `emma`, the neighboring character pairs are:
 
 ```text
 . -> e
@@ -67,300 +56,381 @@ m  -> a
 a  -> .
 ```
 
-There are 26 lowercase letters plus the special `.` token, giving the model
-27 possible characters.
-
-The notebook stores the mapping between characters and integer indexes in two
-dictionaries:
+There are 27 possible symbols in total: 26 letters and the special dot.
+`stoi` maps a character to an integer, while `itos` maps an integer back to a
+character:
 
 ```python
-stoi  # string to integer
-itos  # integer to string
+stoi["a"]  # character -> integer
+itos[1]    # integer -> character
 ```
 
-For example, `stoi["a"]` gives the integer index for `a`, while
-`itos[index]` converts that index back into a character.
+The dot receives index `0`, which makes a context filled with zeros represent
+the beginning of a name.
 
-## 4. What is a bigram?
+## 3. Part 1: the bigram model
 
-A bigram is a pair of neighboring items. In this project, the items are
-characters.
+Notebook: [`makemore_1.ipynb`](makemore_1.ipynb)
 
-For a name such as `emma`, we look at every adjacent pair:
+### 3.1 Counting character transitions
 
-```text
-.e
-em
-mm
-ma
-a.
-```
+A **bigram** is a pair of neighboring characters. The first notebook counts
+how often each character is followed by every other character.
 
-The notebook first stores these pairs in a Python dictionary. The dictionary
-keeps a count for each pair, so it can answer questions such as:
-
-- How many times did `e` come before `m`?
-- How often did `a` appear at the end of a name?
-- What usually follows `.` at the beginning of a name?
-
-## 5. The count table
-
-The counts are then stored in a PyTorch tensor called `N`:
+The counts are stored in a `27 x 27` tensor:
 
 ```python
 N = torch.zeros((27, 27), dtype=torch.int32)
 ```
 
-The meaning of the table is:
-
-- Row: the current character.
-- Column: the next character.
-- Value: how many times that transition appeared.
-
-So `N[ix1, ix2]` is the number of times character `ix2` followed character
+The rows represent the current character, and the columns represent the next
+character. Therefore, `N[ix1, ix2]` tells us how many times `ix2` followed
 `ix1`.
 
-The notebook displays this table as a grid. The row and column labels make it
-easier to see common transitions visually.
+### 3.2 Converting counts into probabilities
 
-## 6. Turning counts into probabilities
-
-Counts are useful, but generation needs probabilities. The notebook
-normalizes each row:
+The count table is normalized row by row:
 
 ```python
 P = (N + 1).float()
 P /= P.sum(1, keepdim=True)
 ```
 
-After this operation, every row sums to 1. A row can now be treated as a
-probability distribution for the next character.
+Adding `1` is simple smoothing. It prevents unseen transitions from having
+exactly zero probability. This is useful because zero probabilities cannot be
+sampled and make `log(0)` invalid.
 
-### Why add 1?
+Each row of `P` is now a probability distribution for the next character.
 
-The `N + 1` step is simple smoothing. Without it, a transition that never
-appeared in the dataset would have probability zero. Zero probabilities are
-awkward because:
+### 3.3 Generating names
 
-- The model can never sample that transition.
-- `log(0)` is negative infinity.
-- A single zero probability can make a likelihood calculation unusable.
+Generation starts with the dot token. The model repeatedly:
 
-Adding one keeps every transition possible, although transitions that appeared
-many times still receive much higher probabilities.
+1. Looks up the probability row for the current character.
+2. Samples the next character with `torch.multinomial`.
+3. Appends it to the output.
+4. Uses it as the next current character.
+5. Stops when it samples the ending dot.
 
-## 7. Generating names
+Sampling is random. A fixed random seed makes an experiment repeatable, but
+different seeds produce different names.
 
-Generation begins with the start token, whose index is `0` in the notebook.
-The model then repeats this process:
+### 3.4 Negative log-likelihood
 
-1. Look up the probability row for the current character.
-2. Sample one next-character index with `torch.multinomial`.
-3. Convert the index back to a character with `itos`.
-4. Add the character to the output.
-5. Use the new character as the current character.
-6. Stop when the model samples `.`.
+The model is evaluated by checking how much probability it gives to the real
+transitions in the dataset. For every transition, we take its log-probability
+and add the results together.
 
-In pseudocode:
-
-```text
-current = start token
-while current is not end token:
-    next = sample_from_probability_row(current)
-    append next to output
-    current = next
-```
-
-Sampling is random, so the output changes between runs. The notebook uses a
-fixed random seed in several places when it needs reproducible results.
-
-## 8. Likelihood and negative log-likelihood
-
-The model can be evaluated by asking how much probability it assigns to the
-transitions that actually appear in the dataset.
-
-For every real transition:
-
-1. Look up its probability.
-2. Take the logarithm of that probability.
-3. Add the log-probabilities together.
-
-This gives the log-likelihood of the dataset under the model.
-
-We usually minimize a loss instead of maximizing a score, so we use negative
-log-likelihood:
+Because training normally minimizes a value, we use negative log-likelihood:
 
 ```text
 NLL = -log-likelihood
 ```
 
-The average negative log-likelihood is easier to compare across datasets of
-different sizes. A lower average NLL means the model gives better probability
-to the observed transitions.
+A lower average NLL means the model assigns higher probability to the observed
+character transitions.
 
-The logarithm is useful because a sequence probability is a product of many
-small probabilities:
+### 3.5 The neural-network version
 
-```text
-P(sequence) = P(first transition) * P(second transition) * ...
-```
-
-Logarithms turn multiplication into addition:
-
-```text
-log(P(sequence)) = log(P1) + log(P2) + ...
-```
-
-## 9. The neural-network version
-
-The notebook next creates a weight matrix:
+Part 1 then expresses the same bigram model with a weight matrix:
 
 ```python
 W = torch.randn((27, 27), requires_grad=True)
 ```
 
-This matrix has the same basic shape as the count table:
+The input character becomes a one-hot vector. Multiplying it by `W` produces
+27 logits, one for each possible next character. Exponentiating and
+normalizing the logits gives probabilities.
 
-- 27 input characters.
-- 27 possible output characters.
+The model is trained with:
 
-Each input character is converted to a one-hot vector. A one-hot vector has a
-`1` at the position for the current character and `0`s everywhere else:
+1. a forward pass,
+2. negative log-likelihood,
+3. `loss.backward()`, and
+4. a gradient-descent update.
 
-```python
-xenc = F.one_hot(xs, num_classes=27).float()
-```
+This shows the connection between a count table and a neural network: both
+learn a distribution over the next character, but the neural-network version
+learns its values through optimization.
 
-The one-hot vector is multiplied by `W`:
+## 4. Part 2: embeddings and a basic MLP
 
-```python
-logits = xenc @ W
-```
+Notebook: [`makemore_2.ipynb`](makemore_2.ipynb)
 
-The result is a set of logits, one for each possible next character. Larger
-logits should correspond to characters the model considers more likely.
+Part 2 moves beyond bigrams. Instead of using only the current character, the
+model uses the previous **three characters** as context.
 
-The notebook converts logits into probabilities by exponentiating and
-normalizing:
-
-```python
-counts = logits.exp()
-probs = counts / counts.sum(1, keepdim=True)
-```
-
-This is equivalent to applying softmax. In later notebooks, the code can use
-PyTorch's built-in cross-entropy functions for a more numerically stable
-implementation.
-
-## 10. Training with gradient descent
-
-The training loop repeats these steps:
-
-1. Run a forward pass to calculate probabilities.
-2. Calculate the average negative log-likelihood.
-3. Clear the old gradients.
-4. Run `loss.backward()` to calculate new gradients.
-5. Move the weights in the direction that reduces the loss.
-
-The update in the notebook is written as:
-
-```python
-W.data += -50 * W.grad
-```
-
-The number `50` is the learning rate used in this experiment. It controls the
-size of each update:
-
-- Too small: training improves slowly.
-- Too large: training can become unstable.
-- A useful value: the loss generally decreases over time.
-
-The notebook also adds a small regularization term based on `W**2`. This
-discourages unnecessarily large weights.
-
-The direct `W.data` update is used because it keeps the lesson close to the
-mathematics. A future version can use a more structured optimizer and update
-the parameters inside a safer `torch.no_grad()` block.
-
-## 11. Why the two models are related
-
-The first model uses a table of observed counts. The second model learns a
-weight table through optimization.
-
-They are not unrelated approaches:
-
-- The count table is a direct estimate from the data.
-- The neural network learns values that produce similar next-character
-  probabilities.
-- One-hot inputs make each row of `W` correspond to one input character.
-
-This makes the bigram model a useful first neural-network example. It is small
-enough to inspect while still demonstrating datasets, logits, probabilities,
-losses, gradients, and parameter updates.
-
-## 12. The two notebooks
-
-The project is split into two notebooks so the ideas can be learned in a
-reasonable order.
-
-### `makemore_1.ipynb`: the bigram model
-
-The first notebook starts with the simplest useful version of makemore. It:
-
-- Counts how often one character follows another.
-- Stores those counts in a `27 x 27` table.
-- Normalizes the rows into probabilities.
-- Generates names from those probabilities.
-- Measures the model with negative log-likelihood.
-- Rebuilds the same idea as a small neural network with a `27 x 27` weight
-  matrix.
-
-This notebook is mainly about understanding character transitions,
-probabilities, loss, gradients, and the connection between counts and neural
-network weights.
-
-### `makemore_2.ipynb`: the MLP language model
-
-The second notebook moves beyond bigrams. Instead of looking at only the
-current character, it uses the previous **three characters** as context.
-
-For example, the model can use:
+For example:
 
 ```text
-context: . . e  ->  next character: m
+context: . . e  ->  target: m
 ```
 
-The notebook:
+### 4.1 Building context/target examples
 
-- Builds `(context, target)` examples with a `block_size` of `3`.
-- Uses `build_dataset(words)` to prepare data consistently.
-- Shuffles the names with a fixed seed.
-- Splits the data into 80% training, 10% development, and 10% test sets.
-- Learns a 10-dimensional embedding for each of the 27 characters.
-- Flattens the three embeddings into 30 inputs.
-- Passes those inputs through a hidden layer of 200 neurons.
-- Produces 27 output logits, one for each possible next character.
-- Uses minibatches of 32 examples during training.
-- Uses `F.cross_entropy` as a numerically stable loss function.
-- Trains for 200,000 steps and lowers the learning rate halfway through.
-- Compares training and development loss.
-- Plots the learned character embeddings and samples new names.
+The notebook uses `block_size = 3`. For every name, it keeps a sliding window
+of three characters and uses the next character as the target.
 
-The main model parameters are:
+If the name is `emma`, examples begin like this:
 
 ```text
-C: 27 x 10 character embedding table
-W1: 30 x 200 first-layer weights
-b1: 200 first-layer biases
-W2: 200 x 27 output-layer weights
-b2: 27 output-layer biases
+. . .  -> e
+. . e  -> m
+. e m  -> m
+e m m  -> a
+m m a  -> .
 ```
 
-This is a real progression from the first notebook. The model now learns a
-useful representation for each character instead of using only one-hot input
-vectors.
+The dataset is split into:
 
-## 13. How to run the notebooks
+- 80% training data,
+- 10% development/validation data, and
+- 10% test data.
+
+The training split updates the model. The development split helps compare
+settings while building the model. The test split should be used as a final
+unbiased check.
+
+### 4.2 Character embeddings
+
+Instead of representing a character only as a one-hot vector, the model learns
+a compact vector for each character:
+
+```python
+C = torch.randn((27, 10))
+```
+
+Here, every one of the 27 symbols has a 10-dimensional embedding. Characters
+that behave similarly can learn similar locations in this embedding space.
+
+The three embeddings are concatenated into 30 inputs:
+
+```text
+3 characters x 10 features = 30 inputs
+```
+
+### 4.3 MLP architecture
+
+The basic model in part 2 contains:
+
+```text
+Embedding: 27 -> 10 features per character
+Flatten:   3 x 10 -> 30 features
+Hidden:    30 -> 200 neurons with tanh
+Output:    200 -> 27 logits
+```
+
+The logits are compared with the target character using cross-entropy loss.
+The model is trained with minibatches, backpropagation, and gradient descent.
+The learning rate is reduced during training so the updates become smaller
+near the end.
+
+## 5. Part 3: manual layers and batch normalization
+
+Notebook: [`makemore_3.ipynb`](makemore_3.ipynb)
+
+Part 3 focuses on understanding what happens inside a neural network instead
+of relying on a large high-level model abstraction.
+
+### 5.1 Manual network components
+
+The notebook organizes the model from basic operations such as:
+
+- an embedding lookup,
+- flattening the context,
+- a linear layer,
+- `tanh` activation, and
+- the final output layer.
+
+The layers are kept as simple Python objects so their parameters and forward
+passes are visible.
+
+### 5.2 Gradient checking
+
+Backpropagation gives analytical gradients. To check that those gradients are
+correct, the notebook compares them with numerical gradients.
+
+The numerical approximation for a parameter is based on slightly changing it
+in both directions:
+
+```text
+numerical gradient ≈ (loss(x + h) - loss(x - h)) / (2h)
+```
+
+The analytical and numerical values should be very close. This is a practical
+way to find mistakes in a backward pass.
+
+The notebook also checks gradients for operations such as matrix
+multiplication and batch normalization.
+
+### 5.3 Batch normalization
+
+Batch normalization normalizes activations in a minibatch. For an activation
+value `x`, it approximately performs:
+
+```text
+xhat = (x - mean) / sqrt(variance + epsilon)
+output = gain * xhat + bias
+```
+
+The learnable `gain` and `bias` parameters allow the network to choose the
+most useful scale and offset after normalization.
+
+Batch normalization can make training more stable by keeping activation
+values in a more controlled range.
+
+### 5.4 Training and evaluation modes
+
+Batch normalization behaves differently during training and evaluation:
+
+- During training, it can use statistics from the current minibatch.
+- During evaluation, it should use running estimates collected during
+  training.
+
+Part 3 introduces the need for a `training` flag and separate evaluation
+logic. This distinction matters when calculating validation loss or sampling
+from the final model.
+
+## 6. Part 4: improving batch normalization
+
+Notebook: [`makemore_4.ipynb`](makemore_4.ipynb)
+
+Part 4 improves the batch-normalization implementation and the training
+workflow.
+
+### 6.1 Running statistics
+
+Instead of depending on one final minibatch, batch normalization keeps running
+estimates of the mean and variance. These estimates are updated during
+training and used when the model is evaluated.
+
+The notebook also calibrates the batch-normalization statistics by passing the
+training data through the model after training. This gives the evaluation
+path better estimates of the distribution seen by the network.
+
+### 6.2 Better initialization and diagnostics
+
+Part 4 continues improving parameter initialization and includes utilities for
+comparing gradients and checking the scale of parameter updates.
+
+Useful diagnostics include:
+
+- comparing analytical and numerical gradients,
+- comparing the size of updates with the size of parameters,
+- tracking training and validation loss, and
+- checking whether the model is overfitting.
+
+These checks make it easier to tell whether a problem comes from the model,
+the data, or the optimization settings.
+
+### 6.3 Evaluation
+
+The notebook uses a `split_loss` helper to evaluate the model on different
+splits without tracking gradients. The model is put into evaluation mode
+before calculating the final train and validation losses.
+
+This is an important improvement over looking only at minibatch training loss:
+the validation loss gives a better idea of how well the model generalizes to
+names it did not use for parameter updates.
+
+## 7. Part 5: reusable layers and a deeper model
+
+Notebook: [`makemore_5.ipynb`](makemore_5.ipynb)
+
+Part 5 turns the ideas from the earlier notebooks into reusable layer classes
+and builds a deeper model.
+
+### 7.1 Reusable layer classes
+
+The notebook defines small components with a common pattern:
+
+- `Linear`
+- `BatchNorm1d`
+- `Tanh`
+- `Embedding`
+- `FlattenConsecutive`
+- `Sequential`
+
+Each layer has a forward call and a `parameters()` method. `Sequential`
+collects the parameters from all of its layers, which makes the training loop
+shorter and easier to reuse.
+
+### 7.2 Longer context
+
+Part 5 uses `block_size = 8`, so the model looks at eight previous characters
+when predicting the next one.
+
+A longer context gives the model more information, but it also increases the
+number of values that must be processed. Simply flattening all eight
+embeddings into one huge layer would make the model unnecessarily large.
+
+### 7.3 Hierarchical processing
+
+The model uses `FlattenConsecutive` to combine characters in groups. It first
+combines neighboring pairs, then combines the resulting representations again.
+This creates a hierarchical structure:
+
+```text
+8 characters
+    ↓
+4 groups of 2
+    ↓
+2 groups of 2
+    ↓
+1 final representation
+```
+
+This is similar to the way a convolutional or hierarchical model can build
+larger patterns from smaller local patterns.
+
+The final model includes:
+
+- 24-dimensional character embeddings,
+- hidden layers with 128 neurons,
+- batch normalization,
+- `tanh` activations,
+- several `Linear` layers, and
+- a final output layer with 27 logits.
+
+The notebook also reduces the scale of the final layer's weights so the model
+does not begin with overly confident predictions.
+
+### 7.4 Training and results
+
+The model is trained with minibatches of 32 examples, simple SGD, and a
+learning-rate step-down later in training. It evaluates train and validation
+loss and samples generated names from the trained network.
+
+The notebook records an example performance result for the larger model:
+
+```text
+about 76K parameters
+training loss: about 1.769
+validation loss: about 1.993
+```
+
+These numbers are tied to the notebook's exact initialization and training
+run. They are useful as a rough reference, not as a guaranteed result.
+
+## 8. The training loop
+
+Although the architecture changes across the five parts, the core training
+cycle stays the same:
+
+1. Select a random minibatch from the training split.
+2. Run the forward pass.
+3. Calculate cross-entropy loss.
+4. Clear old gradients.
+5. Run `loss.backward()`.
+6. Update every parameter with gradient descent.
+7. Record loss and diagnostic values.
+8. Periodically evaluate the training and validation splits.
+
+The final sampling loop starts with a context of start tokens. It predicts one
+character, shifts the context window, and repeats until the end token is
+sampled.
+
+## 9. How to run the notebooks
 
 From the repository root:
 
@@ -371,42 +441,45 @@ cd makemore
 jupyter notebook
 ```
 
-Alternatively, open the notebook in VS Code with the Jupyter extension.
+Alternatively, open the notebooks in VS Code with the Jupyter extension.
 
 For a clean run:
 
-1. Open `makemore_1.ipynb` or `makemore_2.ipynb`.
+1. Open a notebook.
 2. Select the Python environment containing PyTorch.
 3. Restart the kernel.
 4. Run all cells from the beginning.
 
-The notebook is an interactive learning document. It includes intermediate
-outputs and experiments, so it is normal for it to contain more steps than a
-small production script.
+Run the five parts in order when learning the material. The notebooks contain
+intermediate experiments and printed outputs, so they are intended to be read
+and run as learning documents rather than as production scripts.
 
-## 14. Current progress and next steps
+## 10. Progress checklist
 
 - [x] Load and inspect the names dataset.
 - [x] Add start and end tokens.
 - [x] Build a character bigram count table.
 - [x] Convert counts into probabilities.
 - [x] Generate names from the count-based model.
-- [x] Calculate negative log-likelihood.
-- [x] Train the bigram model with a small neural network.
-- [x] Split the data into training, development, and test sets.
-- [x] Build a multilayer perceptron language model.
-- [x] Learn character embeddings and use a larger context.
-- [x] Add minibatch training and learning-rate decay.
-- [ ] Explore deeper models and batch normalization.
-- [ ] Improve initialization and evaluate the test split consistently.
+- [x] Train a simple bigram neural network.
+- [x] Build an embedding-based MLP.
+- [x] Split data into training, development, and test sets.
+- [x] Implement and check neural-network layers manually.
+- [x] Add batch normalization and evaluation mode.
+- [x] Calibrate running batch-normalization statistics.
+- [x] Build reusable layer classes.
+- [x] Build a deeper hierarchical model with a longer context.
+- [ ] Continue experimenting with convolution-style language models.
+- [ ] Improve hyperparameter searches and final test-set reporting.
 
-## 15. Quick reminders
+## 11. Quick reminders
 
 - Run the notebooks from the `makemore` directory so `names.txt` is found.
-- Run each notebook's cells from top to bottom because later cells use earlier
-  variables.
-- Start with `makemore_1.ipynb` before moving to `makemore_2.ipynb`.
+- Run cells from top to bottom because later cells use earlier variables.
+- Start with `makemore_1.ipynb` and move through `makemore_5.ipynb` in order.
 - Generated names are random samples, not guaranteed to be real names.
 - A fixed random seed makes an experiment repeatable.
 - The model predicts characters, not words or meanings.
+- Training loss and validation loss measure different things.
+- Batch normalization needs different behavior during training and evaluation.
 - This code is for learning and experimentation, not production use.

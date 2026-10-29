@@ -3,40 +3,49 @@
 This is my practice implementation while learning character-level language
 models from Andrej Karpathy's **Neural Networks: Zero to Hero** material.
 
-The goal is to understand how a model can learn patterns from names and
-generate new names one character at a time. This is an educational exercise,
-not the official makemore project.
+The goal is to understand how a model learns patterns from names and generates
+new names one character at a time. This is an educational exercise, not the
+official makemore project.
 
-For simple, detailed explanations of both notebooks, see the
+For detailed explanations of the ideas and code, see the
 [makemore study notes](NOTES.md).
 
 ## What is included?
 
-The project currently has two notebooks that show the model growing in stages:
+The project is organized into five main notebooks. Each part builds on the
+previous one:
 
-- [`makemore_1.ipynb`](makemore_1.ipynb): a character bigram model.
-- [`makemore_2.ipynb`](makemore_2.ipynb): a small multilayer perceptron
-  language model with embeddings and a 3-character context.
+1. [`makemore_1.ipynb`](makemore_1.ipynb) — character bigrams and a simple
+   neural-network version.
+2. [`makemore_2.ipynb`](makemore_2.ipynb) — character embeddings and an MLP
+   that uses a three-character context.
+3. [`makemore_3.ipynb`](makemore_3.ipynb) — manually implemented layers,
+   gradient checking, and batch normalization.
+4. [`makemore_4.ipynb`](makemore_4.ipynb) — improved batch normalization,
+   initialization, and evaluation.
+5. [`makemore_5.ipynb`](makemore_5.ipynb) — reusable layers and a deeper
+   hierarchical model with a longer context.
 
-Together, the notebooks cover:
+The notebooks cover:
 
 - Loading and inspecting a dataset of 32,033 names.
 - Adding a special start/end token to each name.
-- Counting character pairs, also called bigrams.
-- Building a `27 x 27` character transition table.
-- Converting counts into probabilities.
-- Sampling new names from a probability table.
-- Measuring a model with negative log-likelihood.
-- Splitting data into training, development, and test sets.
-- Representing characters with learned embeddings.
-- Predicting the next character from a context of three characters.
-- Training an MLP with minibatches, backpropagation, and gradient descent.
-- Evaluating training and development losses.
+- Counting character pairs and turning counts into probabilities.
+- Measuring models with negative log-likelihood and cross-entropy.
+- Preparing training, development, and test splits.
+- Learning character embeddings.
+- Building an MLP language model from basic tensor operations.
+- Implementing reusable `Linear`, `Embedding`, `Tanh`, and
+  `BatchNorm1d` layers.
+- Checking gradients against numerical approximations.
+- Training with minibatches and learning-rate decay.
+- Building a deeper hierarchical model that processes context in groups.
+- Sampling new names from the trained models.
 
 The other important files are:
 
 - [`names.txt`](names.txt): one training name per line.
-- [`NOTES.md`](NOTES.md): detailed explanations and learning notes.
+- [`NOTES.md`](NOTES.md): detailed explanations for all five parts.
 
 ## Quick start
 
@@ -48,7 +57,7 @@ source .venv/bin/activate
 pip install jupyter torch matplotlib
 ```
 
-Open either notebook in VS Code, or run the following from this folder:
+Open a notebook in VS Code, or run the following from this folder:
 
 ```bash
 cd makemore
@@ -60,39 +69,56 @@ earlier, so **Restart Kernel and Run All** is the easiest way to start fresh.
 
 ## Recommended order
 
-Start with [`makemore_1.ipynb`](makemore_1.ipynb). It introduces the basic
-ideas using character counts and a simple bigram neural network.
+Start with `makemore_1.ipynb` and continue through `makemore_5.ipynb` in
+order. The progression is:
 
-Then continue with [`makemore_2.ipynb`](makemore_2.ipynb). It rewrites the
-dataset preparation more clearly and builds a neural network that uses the
-previous three characters to predict the next one.
+```text
+counts and bigrams
+        ↓
+embeddings and a basic MLP
+        ↓
+manual layers and gradient checking
+        ↓
+better batch normalization and initialization
+        ↓
+reusable layers and a deeper hierarchical network
+```
+
+Each notebook is a learning milestone. It is useful to run the earlier
+notebooks first, even when the later notebook contains a more complete model.
 
 ## Main idea
 
-The project follows this learning cycle:
+At every stage, the model learns to predict the next character:
 
 1. Add a start/end marker to each name.
-2. Prepare examples of context characters and next-character targets.
-3. Convert characters into integer indexes and learned embeddings.
-4. Use a neural network to produce logits for the next character.
-5. Calculate cross-entropy loss.
-6. Update the parameters with backpropagation and gradient descent.
-7. Generate names by repeatedly sampling the next character.
+2. Turn text into integer character indexes.
+3. Build context/target examples.
+4. Produce logits for the next character.
+5. Calculate a loss.
+6. Use backpropagation to calculate gradients.
+7. Update the parameters with gradient descent.
+8. Sample characters repeatedly to generate a name.
 
-The first notebook looks only at the current character. The second notebook
-uses a context of three characters, which gives the model more information
-when making a prediction.
+The first part only uses the current character. Later parts use longer
+contexts, learned embeddings, hidden layers, normalization, and a deeper
+architecture to make better predictions.
 
 ## Current status
 
-The bigram model and the first MLP language model are implemented. The second
-notebook now includes an 80% training split, a 10% development split, and a
-10% test split, along with learned character embeddings and minibatch
-training.
+All five learning parts are present:
 
-The next steps are to improve the model and continue through the later
-makemore lessons, including better initialization, normalization, deeper
-networks, and more systematic evaluation.
+- Part 1 implements the count-based bigram model.
+- Part 2 implements an embedding-based MLP.
+- Part 3 introduces reusable ideas such as manual layers, gradient checking,
+  and batch normalization.
+- Part 4 improves the training setup and batch-normalization handling.
+- Part 5 builds a deeper hierarchical model with reusable layer classes.
+
+The notebooks are educational experiments rather than production code. The
+next improvements can include more careful hyperparameter experiments,
+consistent test-set reporting, and further convolution-style language-model
+work.
 
 ## Attribution
 
